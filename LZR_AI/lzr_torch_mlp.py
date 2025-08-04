@@ -1,6 +1,8 @@
 # pip3 install torch torchvision torchaudio
 # 예측 시간: 0.006830초
 
+# PyTorch 기반의 "2-layer MLP(다층 퍼셉트론, 완전연결 신경망)"
+
 import pandas as pd
 import torch
 import torch.nn as nn
