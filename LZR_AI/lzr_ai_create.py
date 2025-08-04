@@ -2,6 +2,8 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 import joblib
 
+# 랜덤포레스트 버전
+
 # 1. 데이터 로드 및 분할
 df = pd.read_csv('mdi.csv')
 target_col = 'HUMAN'

@@ -1,3 +1,4 @@
+# pip install scikit-learn
 # pip install lightgbm
 
 import pandas as pd

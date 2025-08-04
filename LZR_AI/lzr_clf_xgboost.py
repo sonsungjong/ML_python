@@ -1,3 +1,4 @@
+# pip install scikit-learn
 # pip install xgboost
 
 import pandas as pd

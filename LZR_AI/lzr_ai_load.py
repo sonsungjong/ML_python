@@ -1,5 +1,9 @@
 # pip install scikit-learn
 # pip install xgboost
+# pip install lightgbm
+# pip install catboost
+
+# 랜덤포레스트 버전
 
 import joblib
 import pandas as pd
