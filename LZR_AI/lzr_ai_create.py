@@ -10,7 +10,7 @@ from xgboost import XGBClassifier
 from catboost import CatBoostClassifier
 import joblib
 
-select_model_number = 2
+select_model_number = 4
 
 model_name = {
     1: "RandomForest",

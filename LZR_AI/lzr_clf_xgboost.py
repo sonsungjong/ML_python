@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.model_selection import GridSearchCV            # 최적 하이퍼파라미터 탐색용
 import time
-# 예측 시간: 0.104709초
+# 예측 시간: 0.104709초 (여러 샘플 기준)
 
 df = pd.read_csv("mdi.csv", sep=",")
 print(df.info())
