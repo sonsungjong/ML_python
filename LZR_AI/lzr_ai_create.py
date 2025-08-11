@@ -59,6 +59,7 @@ elif model_name[select_model_number] == "CatBoost":
         depth=5,         # 트리 깊이 (max_depth)
         verbose=0,       # 로그 숨김
         random_seed=42,
+        allow_writing_files=False       # 로그 생성 안함
     )
 
 if model is not None:

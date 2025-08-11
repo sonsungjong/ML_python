@@ -27,7 +27,8 @@ model = CatBoostClassifier(
     iterations=30,   # 트리 개수 (n_estimators)
     depth=5,         # 트리 깊이 (max_depth)
     verbose=0,       # 로그 숨김
-    random_seed=42
+    random_seed=42,
+    allow_writing_files=False       # 로그 생성 안함
 )
 model.fit(X_train, y_train)
 
