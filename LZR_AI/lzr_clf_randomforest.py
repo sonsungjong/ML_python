@@ -8,7 +8,7 @@ from sklearn.model_selection import GridSearchCV            # 최적 하이퍼�
 import time
 # 예측 시간: 0.006030초
 
-df = pd.read_csv("mdi.csv", sep=";")
+df = pd.read_csv("mdi.csv", sep=",")
 print(df.info())
 print(df.head())
 

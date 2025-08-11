@@ -17,7 +17,7 @@ print(torch.cuda.device_count())
 print(torch.cuda.get_device_name(0))
 
 # 데이터 로드
-df = pd.read_csv("mdi.csv", sep=";")
+df = pd.read_csv("mdi.csv", sep=",")
 target_col = 'HUMAN'
 X = df.drop(columns=[target_col]).values.astype('float32')
 y = df[target_col].values.astype('int64')
