@@ -12,13 +12,17 @@
 
 # 랜덤포레스트 버전
 
+import csv
 import socket
 import time
 import threading
 import numpy as np
 import pandas as pd
 import queue
+import struct
 import joblib
+from dataclasses import dataclass
+
 
 # 1. 모델 로드 (1회만)
 model = joblib.load('lzr_ai_model.joblib')
@@ -30,6 +34,45 @@ def predict_distance_array(model, arr):
     pred = model.predict(arr)[0]
     return int(pred)
 
+
+HEADER_SIZE = 8
+AI_EXPECT_U16 = 1096
+AI_EXPECT_BYTES = AI_EXPECT_U16 * 2
+
+@dataclass
+class Header:
+    source: int        # uint8
+    destination: int   # uint8
+    msg_id: int        # uint16
+    size: int          # int32 (signed)
+
+def parse_header_le(buf: bytes) -> Header:
+    if len(buf) != HEADER_SIZE:
+        raise ValueError(f"헤더 길이 에러: {len(buf)}")
+    mv = memoryview(buf)
+    source = mv[0]
+    destination = mv[1]
+    msg_id = int.from_bytes(mv[2:4], 'little', signed=False)
+    size   = int.from_bytes(mv[4:8], 'little', signed=True)
+    return Header(source, destination, msg_id, size)
+
+def pack_header_le(h: Header) -> bytes:
+    return (
+        bytes([h.source]) +
+        bytes([h.destination]) +
+        h.msg_id.to_bytes(2, 'little', signed=False) +
+        h.size.to_bytes(4, 'little', signed=True)
+    )
+
+def read_exact(sock: socket.socket, n: int) -> bytes:
+    buf = bytearray()
+    while len(buf) < n:
+        chunk = sock.recv(n - len(buf))
+        if not chunk:
+            return b''
+        buf.extend(chunk)
+    return bytes(buf)
+
 class TCPClient:
     def __init__(self, host, port):
         self.q = queue.Queue(maxsize=1)            # 항상 최신값만 저장 (그 외에는 버림)
@@ -37,11 +80,35 @@ class TCPClient:
         self.port = port
         self.sock = None
         self.running = True
+        self.csv_path = 'log.csv'
 
+        # TCP 클라이언트 시작점
+    def run(self):
+        while self.running:
+            self.connect()
+            if not self.running:
+                break
+            t_recv  = threading.Thread(target=self.receive_thread, daemon=True)
+            t_proc  = threading.Thread(target=self.process_thread, daemon=True)
+            t_proc.start()
+            t_recv.start()
+            t_recv.join()
+            try:
+                self.q.put_nowait(None)
+            except queue.Full:
+                pass
+            t_proc.join()
+            self.close()
+            if self.running:
+                print("5초 후 재연결 시도...")
+                time.sleep(5)
+
+    # 서버 접속용 함수
     def connect(self):
         while self.running:
             try:
                 self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
                 self.sock.connect((self.host, self.port))
                 print("서버에 연결되었습니다.")
                 return
@@ -55,63 +122,84 @@ class TCPClient:
                     pass
                 time.sleep(5)
 
-    # 수신을 위한 쓰레드
-    def receive_thread(self):
+    def close(self):
         try:
-            while self.running:
-                recv_size = 1096 * 2
-                buf = b''
-                while len(buf) < recv_size:
-                    packet = self.sock.recv(recv_size - len(buf))
-                    if not packet:
-                        raise ConnectionError("서버 연결 끊김")
-                    buf += packet
-                # 큐가 꽉 차 있으면 오래된 데이터 버리기
-                if self.q.full():
-                    try:
-                        self.q.get_nowait()
-                    except queue.Empty:
-                        pass
-                self.q.put(buf)
-        except Exception as e:
-            print(f"수신 중 에러: {e}")
-            self.running = False
-        finally:
             if self.sock:
                 self.sock.close()
+        finally:
+            self.sock = None
 
-    # 처리부, 큐에서 꺼내서 처리한다
+    # 수신을 위한 쓰레드 (헤더8 → 바디(size) → print → 큐에 body(bytes) 넣기)
+    def receive_thread(self):
+        try:
+            while self.running and self.sock:
+                header_bytes = read_exact(self.sock, HEADER_SIZE)
+                if len(header_bytes) != HEADER_SIZE:
+                    print("수신 중단: 헤더 수신 실패.")
+                    break
+                h = parse_header_le(header_bytes)
+                print(f"[HEADER] source(1B)={h.source}  destination(1B)={h.destination}  "
+                      f"id(2B)={h.msg_id}  size(4B)={h.size}")
+                body = read_exact(self.sock, h.size)
+                if len(body) != h.size:
+                    print(f"수신 중단: 바디 부족({len(body)}/{h.size}).")
+                    break
+                
+                if h.destination == 3 or h.destination == 5:
+                    # print('수신자 해당함')
+                    if h.msg_id == 50011:
+                        # print('ID 50011 받음')
+                        # ushort(=uint16) 1096개로 변환 (리틀엔디안 명시)
+                        # arr_u16 = np.frombuffer(body, dtype=np.dtype('<u2'), count=AI_EXPECT_U16)
+                        # memcpy 개념 그대로: 바디 바이트를 u16 배열로 '해석'
+                        # print(f"[U16  ] count={arr_u16.size} first5={arr_u16[:5].tolist()} "f"last5={arr_u16[-5:].tolist() if arr_u16.size>=5 else arr_u16.tolist()}")
+
+                        if self.q.full():
+                            try:
+                                self.q.get_nowait()
+                            except queue.Empty:
+                                pass
+                        self.q.put(body)
+                else:
+                    print('수신 대상아님')
+                    continue
+
+        except Exception as e:
+            print(f"수신 중 에러: {e}")
+            # self.running = False
+        
+
+    # 처리부, 큐 바디→u16(1096)→예측→응답 헤더/바디 직접 구성해서 송신
     def process_thread(self):
         try:
-            while self.running:
+            while self.running and self.sock:
                 buf = self.q.get()  # 데이터가 들어올 때까지 블로킹
-                arr = np.frombuffer(buf, dtype=np.uint16)
-                arr = arr.astype(np.float32)
-                result = predict_distance_array(model, arr)
+                if buf is None:
+                    break  # 재연결 루프로 복귀
+
+                arr_u16 = np.frombuffer(buf, dtype=np.dtype('<u2'), count=AI_EXPECT_U16)
+                # 2) float32로 변환
+                arr_f32 = arr_u16.astype(np.float32)
+                result = predict_distance_array(model, arr_f32)
+                if result == 0:
+                    print('NO HUMAN')
+                else:
+                    print('HUMAN')
+
+                # 응답 body 1바이트
+                body = bytes([result & 0xFF])
+                # 응답 헤더 수동 구성
+                print('바디사이즈:',len(body))
+                header = pack_header_le(Header(source=3, destination=1, msg_id=41002, size=len(body)))
+                packet = header + body
                 try:
-                    self.sock.sendall(bytes([result]))
+                    self.sock.sendall(packet)
                     print("예측 결과 전송:", result)
                 except Exception as e:
                     print(f"송신 중 에러: {e}")
-                    self.running = False
+                    break
         except Exception as e:
             print(f"처리 중 에러: {e}")
-        
-    def run(self):
-        while self.running:
-            self.connect()
-            self.running = True
-            t1 = threading.Thread(target=self.receive_thread, daemon=True)
-            t2 = threading.Thread(target=self.process_thread, daemon=True)
-            t1.start()
-            t2.start()
-            t1.join()
-            t2.join()
-            if self.sock:
-                self.sock.close()
-            if self.running:
-                print("5초 후 재연결 시도...")
-                time.sleep(5)
 
     def stop(self):
         self.running = False
