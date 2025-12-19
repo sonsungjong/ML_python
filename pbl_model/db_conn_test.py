@@ -32,11 +32,11 @@ if __name__ == "__main__":
     conn = create_connection()
     if conn:
         # 테이블에서 상위 5개 데이터만 가져와서 테스트
-        select_query = "SELECT * FROM BT_ITEM_INFO_MNG LIMIT 5"
+        select_query = "SELECT * FROM BT_PRCHS_MTNC_SITU"
         try:
             data = execute_read_query(conn, select_query)
             if data:
-                print("\n--- Data from BT_ITEM_INFO_MNG ---")
+                print("\n--- Data from BT_PRCHS_MTNC_SITU ---")
                 for row in data:
                     print(row)
             else:
