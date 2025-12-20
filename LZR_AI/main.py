@@ -138,17 +138,15 @@ class TCPClient:
                     print("수신 중단: 헤더 수신 실패.")
                     break
                 h = parse_header_le(header_bytes)
-                print(f"[HEADER] source(1B)={h.source}  destination(1B)={h.destination}  "
-                      f"id(2B)={h.msg_id}  size(4B)={h.size}")
+                # print(f"[HEADER] source(1B)={h.source}  destination(1B)={h.destination}  "f"id(2B)={h.msg_id}  size(4B)={h.size}")
                 body = read_exact(self.sock, h.size)
                 if len(body) != h.size:
                     print(f"수신 중단: 바디 부족({len(body)}/{h.size}).")
                     break
                 
                 if h.destination == 3 or h.destination == 5:
-                    # print('수신자 해당함')
                     if h.msg_id == 50011:
-                        # print('ID 50011 받음')
+                        #print(f"[HEADER] source(1B)={h.source}  destination(1B)={h.destination}  "f"id(2B)={h.msg_id}  size(4B)={h.size}")
                         # ushort(=uint16) 1096개로 변환 (리틀엔디안 명시)
                         # arr_u16 = np.frombuffer(body, dtype=np.dtype('<u2'), count=AI_EXPECT_U16)
                         # memcpy 개념 그대로: 바디 바이트를 u16 배열로 '해석'
@@ -161,7 +159,7 @@ class TCPClient:
                                 pass
                         self.q.put(body)
                 else:
-                    print('수신 대상아님')
+                    # print('수신 대상아님')
                     continue
 
         except Exception as e:
@@ -182,19 +180,21 @@ class TCPClient:
                 arr_f32 = arr_u16.astype(np.float32)
                 result = predict_distance_array(model, arr_f32)
                 if result == 0:
-                    print('NO HUMAN')
+                    #print('NO HUMAN')
+                    pass
                 else:
-                    print('HUMAN')
+                    #print('HUMAN')
+                    pass
 
                 # 응답 body 1바이트
                 body = bytes([result & 0xFF])
                 # 응답 헤더 수동 구성
-                print('바디사이즈:',len(body))
+                #print('바디사이즈:',len(body))
                 header = pack_header_le(Header(source=3, destination=1, msg_id=41002, size=len(body)))
                 packet = header + body
                 try:
                     self.sock.sendall(packet)
-                    print("예측 결과 전송:", result)
+                    #print("예측 결과 전송:", result)
                 except Exception as e:
                     print(f"송신 중 에러: {e}")
                     break

@@ -16,7 +16,7 @@ model_name = {
     1: "RandomForest",
     2: "LightGBM",
     3: "Pytorch",
-    4: "XGBoost",
+    4: "XGBoost",       # 사람 잘 못찾으면 scale_pos_weight 추가해서 사람 감지율 상승
     5: "CatBoost"
 }
 
@@ -31,14 +31,14 @@ y = df[target_col]
 model = None
 if model_name[select_model_number] == "RandomForest":
     model = RandomForestClassifier(
-        n_estimators=30,            # 30 ~ 50
-        max_depth=5,                # 5 ~ 10
+        n_estimators=50,            # 30 ~ 50
+        max_depth=7,                # 5 ~ 10
         random_state=42
     )
 elif model_name[select_model_number] == "LightGBM":
     model = LGBMClassifier(
-        n_estimators=30,            # 30 ~ 100
-        max_depth=5,                # 3 ~ 10
+        n_estimators=50,            # 30 ~ 100
+        max_depth=7,                # 3 ~ 10
         n_jobs=1,           # CPU 코어 1개만 사용
         random_state=42
     )
@@ -46,17 +46,19 @@ elif model_name[select_model_number] == "Pytorch":
     pass
 elif model_name[select_model_number] == "XGBoost":
     model = XGBClassifier(
-        n_estimators=30,            # 30 ~ 100
-        max_depth=5,                # 3 ~ 10
+        n_estimators=50,
+        max_depth=7,
+        learning_rate=0.1,
         eval_metric='logloss',
-        n_jobs=1,           # CPU 코어 1개만 사용
+        # n_jobs=1,           # CPU 코어 1개만 사용
+        # device='cuda',          # GPU 사용
         tree_method='hist',
         random_state=42
     )
 elif model_name[select_model_number] == "CatBoost":
     model = CatBoostClassifier(
-        iterations=30,   # 트리 개수 (n_estimators)
-        depth=5,         # 트리 깊이 (max_depth)
+        iterations=50,   # 트리 개수 (n_estimators)
+        depth=7,         # 트리 깊이 (max_depth)
         verbose=0,       # 로그 숨김
         random_seed=42,
         allow_writing_files=False       # 로그 생성 안함
